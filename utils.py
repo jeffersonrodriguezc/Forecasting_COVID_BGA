@@ -1,5 +1,7 @@
+import re 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 import matplotlib.pyplot as plt
 
 from statsmodels.tsa.stattools import adfuller
@@ -7,12 +9,180 @@ from sklearn.linear_model import LinearRegression
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 
-def copy_and_modify_dict(_dict:dict, update_dict: dict):
+def sort_nicely( l ): 
+  """ Sort the given list in the way that humans expect. 
+  """ 
+  convert = lambda text: int(text) if text.isdigit() else text 
+  alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
+  l.sort( key=alphanum_key ) 
+
+
+def copy_and_modify_dict(_dict: dict, update_dict: dict):
     copy_dict = _dict.copy()
     copy_dict.update(update_dict)
     return copy_dict
 
-# Funciones para analizar las series | Créditos: github.com/madagra/
+
+# ML models helper functions.
+# ================================================================================
+
+
+def predict_next_window_recursive(model, input_data, future_window=14):
+    predictions = []
+    x_batch = [val for val in input_data]
+    for _ in range(future_window):
+        # Predict the value and append it to predictions list.
+        pred_val = model.predict(np.asarray([x_batch]))
+        predictions.append(pred_val[0])
+
+        # Modify the x_batch: pop the first value and add pred_val to last index.
+        x_batch.append(pred_val[0])
+        x_batch.pop(0)
+
+    return np.asarray(predictions)
+
+
+def predict_next_window_direct(models, input_data):
+    predictions = []
+    for model in models:
+        predictions.append(model.predict(np.expand_dims(input_data, 0)))
+
+    return np.asarray(predictions)
+
+
+# Plot functions.
+# ================================================================================
+
+
+def plot_serie_with_next_window_prediction(model,
+                                           train_df,
+                                           test_df,
+                                           scaler,
+                                           w_size,
+                                           f_steps,
+                                           col_idx=33,
+                                           recursive=False,
+                                           title='',
+                                           figsize=(18, 6)):
+    """This function assumes you're using a DataFrame with unscaled values"""
+    fig = plt.figure(figsize=figsize)
+    plt.title(title)
+
+    # Inverse transform the train values and plot them.
+    train_x_values = train_df.index
+    train_y_values = train_df.values[:, col_idx]
+    plt.plot(train_x_values,
+             train_y_values,
+             c='black',
+             label='Casos de ajuste')
+
+    # Split the test df in three parts: one for the window values used for
+    # predicting the last values from the test df, one for the last possible
+    # predicted values from the test df and one df for the remaining values.
+    rem_df = test_df.iloc[:-(w_size + f_steps)]
+    rem_x_values = rem_df.index
+    rem_y_values = rem_df.values[:, col_idx]
+    plt.plot(rem_x_values, rem_y_values, c='blue', label='Casos de prueba')
+
+    w_df = test_df.iloc[-(w_size + f_steps):-f_steps]
+    w_x_values = w_df.index
+    w_y_values = w_df.values[:, col_idx]
+    plt.plot(w_x_values,
+             w_y_values,
+             c='yellow',
+             label='Ventana utilizada para predecir')
+
+    last_df = test_df.iloc[-f_steps:]
+    last_x_values = last_df.index
+    last_y_values = last_df.values[:, col_idx]
+    plt.plot(last_x_values,
+             last_y_values,
+             c='orange',
+             label='Ultimos valores reales')
+
+    # Predict the values after the last window.
+    x_values = scaler.transform(
+        np.expand_dims(w_df.values[:, col_idx], axis=-1))
+
+    if isinstance(model, tf.keras.Model):
+        pass
+    else:
+        if recursive:
+            pred_values = predict_next_window_recursive(model,
+                                                        x_values[..., 0],
+                                                        future_window=f_steps)
+        else:
+            pred_values = predict_next_window_direct(model, x_values[..., 0])
+
+    pred_values = scaler.inverse_transform(pred_values)
+    plt.plot(last_x_values,
+             pred_values.ravel(),
+             c='red',
+             label='Valores predichos',
+             marker='o',
+             markersize=4)
+
+    plt.legend()
+
+
+def predict_and_plot_next_window_from_date(model,
+                                           df,
+                                           scaler,
+                                           start_date,
+                                           w_size,
+                                           f_steps,
+                                           col_idx=33,
+                                           recursive=False,
+                                           title='',
+                                           figsize=(18, 6)):
+
+    fig = plt.figure(figsize=figsize)
+    plt.title(title)
+
+    w_df = df.loc[df.index >= start_date]
+    w_df = w_df.iloc[:w_size]
+    w_x_values = w_df.index
+    w_y_values = w_df.values[:, col_idx]
+    plt.plot(w_x_values,
+             w_y_values,
+             c='blue',
+             label='Ventana utilizada para predecir')
+
+    f_df = df.loc[df.index >= start_date]
+    f_df = f_df.iloc[w_size:(w_size + f_steps)]
+    f_x_values = f_df.index
+    f_y_values = f_df.values[:, col_idx]
+    plt.plot(f_x_values,
+             f_y_values,
+             c='orange',
+             label='Ultimos valores reales')
+
+    # Predict the values after the last window.
+    x_values = scaler.transform(
+        np.expand_dims(w_df.values[:, col_idx], axis=-1))
+
+    if isinstance(model, tf.keras.Model):
+        pass
+    else:
+        if recursive:
+            pred_values = predict_next_window_recursive(model,
+                                                        x_values[..., 0],
+                                                        future_window=f_steps)
+        else:
+            pred_values = predict_next_window_direct(model, x_values[..., 0])
+
+    pred_values = scaler.inverse_transform(pred_values)
+    plt.plot(f_x_values,
+             pred_values.ravel(),
+             c='red',
+             label='Valores predichos',
+             marker='o',
+             markersize=4)
+
+    plt.legend()
+
+
+# Functions to analyze the series | Credits: github.com/madagra/
 class TargetTransformer:
     """
     Perform some transformation on the time series

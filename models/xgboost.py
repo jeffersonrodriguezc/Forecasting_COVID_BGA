@@ -1,12 +1,15 @@
+import os
 import numpy as np
 import pandas as pd
 import xgboost as xgb
 
+from glob import glob
 from functools import partial
 from hyperopt import fmin, tpe, hp, Trials, STATUS_OK, STATUS_FAIL
-from sklearn.metrics import make_scorer
+from sklearn.metrics import make_scorer, mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 
+from utils import sort_nicely
 
 # MAPE computation
 def mape(y, yhat, perc=False):
@@ -20,7 +23,8 @@ def mape(y, yhat, perc=False):
     return mape * 100. if perc else mape
 
 
-mape_scorer = make_scorer(mape, greater_is_better=False)
+# mape_scorer = make_scorer(mape, greater_is_better=False)
+mape_scorer = make_scorer(mean_squared_error)
 
 
 def train_xgb(params, X_train, y_train):
@@ -118,3 +122,43 @@ def optimize_xgb(X_train, y_train, max_evals=10):
         gamma: {best["gamma"]}
     """)
     return best, trials
+
+
+def train_direct_xgb(x_train_dset, y_train_dset, params):
+    print('Training XGBoosts models using a direct approach...')
+    models_res = []
+    for idx in range(len(x_train_dset)):
+        print('Training XGBoost model {}...'.format(idx))
+        res = train_xgb(params[idx], x_train_dset[idx], y_train_dset[idx])
+        models_res.append(res)
+
+    return models_res
+
+
+def optimize_direct_xgb(x_dset, y_dset, max_evals=10):
+    params, trials = [], []
+    print('Optimizing XGBoosts models using a direct approach...')
+    for idx, (X_train, y_train) in enumerate(zip(x_dset, y_dset)):
+        print('Finding best params for XGBoost model {}...'.format(idx))
+        best_params, best_trials = optimize_xgb(X_train, y_train, max_evals=max_evals)
+        params.append(best_params)
+        trials.append(best_trials)
+
+    return params, trials
+
+def predict_direct_xgb(X_test, models):
+    predictions = []
+    for model in models:
+        predictions.append(model.predict(X_test))
+    return np.hstack(predictions)
+
+
+def load_direct_model(source_dir):
+    model_paths = glob(os.path.join(source_dir, '*'))
+    sort_nicely(model_paths)
+    models = []
+    for model_path in model_paths:
+        trained_xgb = xgb.XGBRegressor()
+        trained_xgb.load_model(model_path)
+        models.append(trained_xgb)
+    return models

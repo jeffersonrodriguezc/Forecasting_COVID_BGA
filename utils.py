@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 from statsmodels.tsa.stattools import adfuller
 from sklearn.linear_model import LinearRegression
@@ -307,8 +308,8 @@ def preproccesing_data(data, data_colombia):
     country_freq = data_selected.groupby(['location']).agg({'date': 'count'}).rename(columns={'date': 'num_records'})
     records, counts = np.unique(country_freq.num_records.values, return_counts=True)
     result_list = list(zip(records[np.argsort(counts)][::-1],counts[np.argsort(counts)][::-1]))
-    print('Max group of records {}'.format(max(counts)))
-    print('Order by num of records {}'.format(result_list))
+    #print('Max group of records {}'.format(max(counts)))
+    #print('Order by num of records {}'.format(result_list))
     max_value = result_list[0][0]
     print('Max value in days {}'.format(max_value))
     
@@ -316,8 +317,7 @@ def preproccesing_data(data, data_colombia):
     data_to_use = defaultdict(list)
     # use data tem to less countries
     for index, row in data_selected.iterrows():
-        # new_cases_smoothed.
-        data_to_use[row.location].append(row.new_cases_smoothed)
+        data_to_use[row.location].append(row.new_cases)
 
     final_dict = dict()
     for country in data_to_use.keys():
@@ -353,8 +353,10 @@ def preproccesing_data(data, data_colombia):
     # unstack and joins the dataframes
     data_colombia_by_city = data_colombia_by_city.cases.unstack().T.fillna(axis=0, method='backfill', inplace=False)
     data_colombia_by_dep = data_colombia_by_dep.cases.unstack().T.fillna(axis=0, method='backfill', inplace=False)
+    # cities and dep with the same name - dont take into account for both dataframes
+    to_include = list(set(data_colombia_by_dep.keys()).difference(set(data_colombia_by_city.keys())))
     # join
-    data_colombia_main = data_colombia_by_city.join(data_colombia_by_dep)
+    data_colombia_main = data_colombia_by_city.join(data_colombia_by_dep[to_include])
     # fix the index
     #data_colombia_main['date'] = data_colombia_main.index.astype('datetime64[ns]')
     data_colombia_main['date'] = pd.to_datetime(data_colombia_main.index,
@@ -363,5 +365,6 @@ def preproccesing_data(data, data_colombia):
     data_colombia_main.set_index('date', inplace=True)
     # sincronize the sequences
     df_join = data_to_use.join(data_colombia_main)
-
-    return df_join
+    df_join.fillna(axis=0, method='backfill', inplace=True)
+ 	
+    return df_join 

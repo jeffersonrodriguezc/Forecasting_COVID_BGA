@@ -295,3 +295,73 @@ def ts_analysis_plots(data, n_lags=100):
     axs[3].set(xlabel="lag", ylabel="Valor PACF")
 
     plt.show()
+
+# for preproccesing data
+def preproccesing_data(data, data_colombia):
+    # all countries
+    timeline = sorted(np.unique(data.date.astype('datetime64[ns]')))
+    data_selected = data.loc[(~data.iso_code.isna()) & (data.iso_code != 'OWID_WRL'), [
+        'iso_code', 'continent', 'location', 'date', 'new_cases',
+        'new_cases_smoothed', 'new_deaths', 'new_deaths_smoothed']]
+
+    country_freq = data_selected.groupby(['location']).agg({'date': 'count'}).rename(columns={'date': 'num_records'})
+    records, counts = np.unique(country_freq.num_records.values, return_counts=True)
+    result_list = list(zip(records[np.argsort(counts)][::-1],counts[np.argsort(counts)][::-1]))
+    print('Max group of records {}'.format(max(counts)))
+    print('Order by num of records {}'.format(result_list))
+    max_value = result_list[0][0]
+    print('Max value in days {}'.format(max_value))
+    
+    # build the structure and apply padding based on max value of days
+    data_to_use = defaultdict(list)
+    # use data tem to less countries
+    for index, row in data_selected.iterrows():
+        # new_cases_smoothed.
+        data_to_use[row.location].append(row.new_cases_smoothed)
+
+    final_dict = dict()
+    for country in data_to_use.keys():
+        diff = max_value - len(data_to_use[country])
+        final_dict[country] = [0.0] * diff + data_to_use[country]
+
+    del data_to_use
+    data_to_use = pd.DataFrame(final_dict)
+    data_to_use['date'] = timeline
+    data_to_use.set_index('date', inplace=True)
+    data_to_use.fillna(axis=0, method='backfill', inplace=True)
+
+    ##### Data Colombia
+    # how many cases are there by dep
+    df_freq_dep = data_colombia.groupby(['Nombre departamento']).count()['Fecha de notificación'].to_frame().rename(
+                                    columns={'Fecha de notificación': 'Casos'})
+    # how many cases are there by country
+    df_freq = data_colombia.groupby(['Nombre municipio']).count()['Fecha de notificación'].to_frame().rename(
+                                    columns={'Fecha de notificación': 'Casos'})
+    # group dep and city data by notification date
+    data_colombia_by_city = data_colombia.groupby(
+        ['Nombre municipio', 'Fecha de notificación']).agg({
+            'Fecha de notificación':
+            'count'
+        }).rename(columns={'Fecha de notificación': 'cases'})
+
+    data_colombia_by_dep = data_colombia.groupby(
+        ['Nombre departamento', 'Fecha de notificación']).agg({
+            'Fecha de notificación':
+            'count'
+        }).rename(columns={'Fecha de notificación': 'cases'})
+
+    # unstack and joins the dataframes
+    data_colombia_by_city = data_colombia_by_city.cases.unstack().T.fillna(axis=0, method='backfill', inplace=False)
+    data_colombia_by_dep = data_colombia_by_dep.cases.unstack().T.fillna(axis=0, method='backfill', inplace=False)
+    # join
+    data_colombia_main = data_colombia_by_city.join(data_colombia_by_dep)
+    # fix the index
+    #data_colombia_main['date'] = data_colombia_main.index.astype('datetime64[ns]')
+    data_colombia_main['date'] = pd.to_datetime(data_colombia_main.index,
+                                            infer_datetime_format=False,
+                                            format='%d/%m/%Y %H:%M:%S')
+    data_colombia_main.set_index('date', inplace=True)
+    # sincronize the sequences
+    df_join = data_to_use.join(data_colombia_main)
+
+    return df_join

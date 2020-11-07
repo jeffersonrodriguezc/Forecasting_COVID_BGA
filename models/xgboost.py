@@ -9,7 +9,7 @@ from hyperopt import fmin, tpe, hp, Trials, STATUS_OK, STATUS_FAIL
 from sklearn.metrics import make_scorer, mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 
-from utils import sort_nicely
+from Forecasting_COVID_BGA.utils import sort_nicely
 
 # MAPE computation
 def mape(y, yhat, perc=False):

@@ -53,8 +53,6 @@ def predict_next_window_direct(models, input_data):
 
 # Plot functions.
 # ================================================================================
-
-
 def plot_serie_with_next_window_prediction(model,
                                            train_df,
                                            test_df,
@@ -90,7 +88,7 @@ def plot_serie_with_next_window_prediction(model,
     w_y_values = w_df.values[:, col_idx]
     plt.plot(w_x_values,
              w_y_values,
-             c='yellow',
+             c='orange',
              label='Ventana utilizada para predecir')
 
     last_df = test_df.iloc[-f_steps:]
@@ -98,16 +96,25 @@ def plot_serie_with_next_window_prediction(model,
     last_y_values = last_df.values[:, col_idx]
     plt.plot(last_x_values,
              last_y_values,
-             c='orange',
+             c='green',
              label='Ultimos valores reales')
 
-    # Predict the values after the last window.
-    x_values = scaler.transform(
-        np.expand_dims(w_df.values[:, col_idx], axis=-1))
-
     if isinstance(model, tf.keras.Model):
-        pass
+        if scaler.var_.shape[0] > 1:
+            x_values = scaler.transform(w_df.values)
+            pred_values = model.predict(np.expand_dims(x_values, axis=0))
+            tem_last = np.zeros((last_df.shape))
+            tem_last[:,col_idx] = pred_values.ravel()       
+            #last_df.loc[:,'BUCARAMANGA'] = pred_values.ravel()
+            pred_values = scaler.inverse_transform(tem_last)
+            pred_values = pred_values[:,col_idx]
+        else:
+            x_values = scaler.transform(np.expand_dims(w_df.values[:, col_idx], axis=-1))
+            pred_values = model.predict(np.expand_dims(x_values.reshape(-1,1), axis=0))
+            pred_values = scaler.inverse_transform(pred_values)
     else:
+	# Predict the values after the last window.
+        x_values = scaler.transform(np.expand_dims(w_df.values[:, col_idx], axis=-1))
         if recursive:
             pred_values = predict_next_window_recursive(model,
                                                         x_values[..., 0],
@@ -115,7 +122,7 @@ def plot_serie_with_next_window_prediction(model,
         else:
             pred_values = predict_next_window_direct(model, x_values[..., 0])
 
-    pred_values = scaler.inverse_transform(pred_values)
+        pred_values = scaler.inverse_transform(pred_values)
     plt.plot(last_x_values,
              pred_values.ravel(),
              c='red',
@@ -163,7 +170,7 @@ def predict_and_plot_next_window_from_date(model,
         np.expand_dims(w_df.values[:, col_idx], axis=-1))
 
     if isinstance(model, tf.keras.Model):
-        pass
+        pred_values = model.predict(np.expand_dims(x_values.reshape(-1,1), axis=0))
     else:
         if recursive:
             pred_values = predict_next_window_recursive(model,
@@ -332,23 +339,23 @@ def preproccesing_data(data, data_colombia):
 
     ##### Data Colombia
     # how many cases are there by dep
-    df_freq_dep = data_colombia.groupby(['Nombre departamento']).count()['Fecha de notificación'].to_frame().rename(
-                                    columns={'Fecha de notificación': 'Casos'})
+    df_freq_dep = data_colombia.groupby(['Nombre departamento']).count()['Fecha de inicio de síntomas'].to_frame().rename(
+                                    columns={'Fecha de inicio de síntomas': 'Casos'})
     # how many cases are there by country
-    df_freq = data_colombia.groupby(['Nombre municipio']).count()['Fecha de notificación'].to_frame().rename(
-                                    columns={'Fecha de notificación': 'Casos'})
-    # group dep and city data by notification date
+    df_freq = data_colombia.groupby(['Nombre municipio']).count()['Fecha de inicio de síntomas'].to_frame().rename(
+                                    columns={'Fecha de inicio de síntomas': 'Casos'})
+    # group dep and city data by 'Fecha de inicio de síntomas'
     data_colombia_by_city = data_colombia.groupby(
-        ['Nombre municipio', 'Fecha de notificación']).agg({
-            'Fecha de notificación':
+        ['Nombre municipio', 'Fecha de inicio de síntomas']).agg({
+            'Fecha de inicio de síntomas':
             'count'
-        }).rename(columns={'Fecha de notificación': 'cases'})
+        }).rename(columns={'Fecha de inicio de síntomas': 'cases'})
 
     data_colombia_by_dep = data_colombia.groupby(
-        ['Nombre departamento', 'Fecha de notificación']).agg({
-            'Fecha de notificación':
+        ['Nombre departamento', 'Fecha de inicio de síntomas']).agg({
+            'Fecha de inicio de síntomas':
             'count'
-        }).rename(columns={'Fecha de notificación': 'cases'})
+        }).rename(columns={'Fecha de inicio de síntomas': 'cases'})
 
     # unstack and joins the dataframes
     data_colombia_by_city = data_colombia_by_city.cases.unstack().T.fillna(axis=0, method='backfill', inplace=False)
@@ -367,4 +374,4 @@ def preproccesing_data(data, data_colombia):
     df_join = data_to_use.join(data_colombia_main)
     df_join.fillna(axis=0, method='backfill', inplace=True)
  	
-    return df_join 
+    return df_join

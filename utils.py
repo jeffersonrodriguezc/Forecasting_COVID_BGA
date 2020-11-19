@@ -83,7 +83,8 @@ def plot_serie_with_next_window_prediction(model,
     rem_y_values = rem_df.values[:, col_idx]
     plt.plot(rem_x_values, rem_y_values, c='blue', label='Casos de prueba')
 
-    w_df = test_df.iloc[-(w_size + f_steps):-f_steps]
+    #w_df = test_df.iloc[-(w_size + f_steps):-f_steps]
+    w_df = train_df.iloc[-w_size:]
     w_x_values = w_df.index
     w_y_values = w_df.values[:, col_idx]
     plt.plot(w_x_values,
@@ -111,7 +112,10 @@ def plot_serie_with_next_window_prediction(model,
         else:
             x_values = scaler.transform(np.expand_dims(w_df.values[:, col_idx], axis=-1))
             pred_values = model.predict(np.expand_dims(x_values.reshape(-1,1), axis=0))
+            x_values_2 = list(x_values[..., 0][:-f_steps])+(pred_values.ravel().tolist())
+            pred_values_2 = model.predict(np.expand_dims(np.array(x_values_2).reshape(-1,1), axis=0))
             pred_values = scaler.inverse_transform(pred_values)
+            pred_values_2 = scaler.inverse_transform(pred_values_2)
     else:
 	# Predict the values after the last window.
         x_values = scaler.transform(np.expand_dims(w_df.values[:, col_idx], axis=-1))
@@ -119,18 +123,34 @@ def plot_serie_with_next_window_prediction(model,
             pred_values = predict_next_window_recursive(model,
                                                         x_values[..., 0],
                                                         future_window=f_steps)
+            # Predictions after predictions (an extra future windows)
+            x_values_2 = list(x_values[..., 0][:-f_steps])+(pred_values.ravel().tolist())
+            pred_values_2 = predict_next_window_recursive(model,
+                                                          x_values_2,
+                                                          future_window=f_steps)	  
         else:
             pred_values = predict_next_window_direct(model, x_values[..., 0])
+            x_values_2 = list(x_values[..., 0][:-f_steps])+(pred_values.ravel().tolist())
+            pred_values_2 = predict_next_window_direct(model, x_values_2)
 
         pred_values = scaler.inverse_transform(pred_values)
+        pred_values_2 = scaler.inverse_transform(pred_values_2)
     plt.plot(last_x_values,
              pred_values.ravel(),
-             c='red',
-             label='Valores predichos',
+             c='brown',
+             label='Valores presentes ajustados',
              marker='o',
              markersize=4)
-
+    plt.plot(pd.date_range(start=last_x_values[-1], periods=f_steps+1)[1:],
+             pred_values_2.ravel(),
+             label='Valores futuros predichos',
+             c='red',
+             marker='o',
+             markersize=4)
+    
+    plt.vlines(last_x_values[-1], 0, train_y_values.max(), colors='blue', linestyles='dashed')
     plt.legend()
+    return fig
 
 
 def predict_and_plot_next_window_from_date(model,

@@ -155,6 +155,7 @@ def predict_direct_xgb(X_test, models):
 
 def load_direct_model(source_dir):
     model_paths = glob(os.path.join(source_dir, '*'))
+    model_paths.pop(model_paths.index(source_dir+'scaler.pkl'))
     sort_nicely(model_paths)
     models = []
     for model_path in model_paths:

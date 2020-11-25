@@ -1,4 +1,5 @@
 import re 
+import datetime
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -50,20 +51,52 @@ def predict_next_window_direct(models, input_data):
 
     return np.asarray(predictions)
 
+def predictor(model, w_df, scaler, f_steps, col_idx, recursive):    
+    if isinstance(w_df, list):
+        x = np.array(w_df)
+    else:
+        x = w_df.values[:, col_idx] 
+    
+    if isinstance(model, tf.keras.Model):
+        # multivariable
+        if scaler.var_.shape[0] > 1:
+            x_values = scaler.transform(w_df.values)
+            pred_values = model.predict(np.expand_dims(x_values, axis=0))
+            tem_last = np.zeros((last_df.shape))
+            tem_last[:,col_idx] = pred_values.ravel()       
+            #last_df.loc[:,'BUCARAMANGA'] = pred_values.ravel()
+            pred_values = scaler.inverse_transform(tem_last)
+            pred_values = pred_values[:,col_idx]
+        else:
+            x_values = scaler.transform(np.expand_dims(x, axis=-1))
+            pred_values = model.predict(np.expand_dims(x_values.reshape(-1,1), axis=0))
+            pred_values = scaler.inverse_transform(pred_values)
+    else:
+        x_values = scaler.transform(np.expand_dims(x, axis=-1))
+        if recursive:
+            pred_values = predict_next_window_recursive(model,
+                                                        x_values[..., 0],
+                                                        future_window=f_steps) 
+        else:
+            pred_values = predict_next_window_direct(model, x_values[..., 0])
 
+        pred_values = scaler.inverse_transform(pred_values)
+    return pred_values    
 # Plot functions.
 # ================================================================================
 def plot_serie_with_next_window_prediction(model,
                                            train_df,
                                            test_df,
                                            scaler,
-                                           w_size,
-                                           f_steps,
+                                           params,
                                            col_idx=33,
                                            recursive=False,
                                            title='',
                                            figsize=(18, 6)):
     """This function assumes you're using a DataFrame with unscaled values"""
+    w_size = params['past_window']
+    f_steps = params['future_window']
+    
     fig = plt.figure(figsize=figsize)
     plt.title(title)
 
@@ -75,81 +108,57 @@ def plot_serie_with_next_window_prediction(model,
              c='black',
              label='Casos de ajuste')
 
-    # Split the test df in three parts: one for the window values used for
-    # predicting the last values from the test df, one for the last possible
-    # predicted values from the test df and one df for the remaining values.
-    rem_df = test_df.iloc[:-(w_size + f_steps)]
-    rem_x_values = rem_df.index
-    rem_y_values = rem_df.values[:, col_idx]
-    plt.plot(rem_x_values, rem_y_values, c='blue', label='Casos de prueba')
-
-    #w_df = test_df.iloc[-(w_size + f_steps):-f_steps]
-    w_df = train_df.iloc[-w_size:]
-    w_x_values = w_df.index
-    w_y_values = w_df.values[:, col_idx]
-    plt.plot(w_x_values,
-             w_y_values,
-             c='orange',
-             label='Ventana utilizada para predecir')
-
-    last_df = test_df.iloc[-f_steps:]
-    last_x_values = last_df.index
-    last_y_values = last_df.values[:, col_idx]
-    plt.plot(last_x_values,
-             last_y_values,
-             c='green',
-             label='Ultimos valores reales')
-
-    if isinstance(model, tf.keras.Model):
-        if scaler.var_.shape[0] > 1:
-            x_values = scaler.transform(w_df.values)
-            pred_values = model.predict(np.expand_dims(x_values, axis=0))
-            tem_last = np.zeros((last_df.shape))
-            tem_last[:,col_idx] = pred_values.ravel()       
-            #last_df.loc[:,'BUCARAMANGA'] = pred_values.ravel()
-            pred_values = scaler.inverse_transform(tem_last)
-            pred_values = pred_values[:,col_idx]
+    # The first test window size is the same than the final train window size
+    if params['mode']=='testing':
+        if params['lagging']:
+            # remove the lag windows #['BUCARAMANGA'].to_frame()
+            lag_values = test_df.loc[test_df.index > params['final_date']-datetime.timedelta(days=params['lag'])]
+            # plot lag values and vertical line
+            plt.plot(lag_values.index,
+                    lag_values.values[:, col_idx],
+                    c='green',
+                    label='Valores de rezago')       
+            # plot predictions for the lag windows         
+            plt.vlines(lag_values.index[-1], 0, train_y_values.max(), colors='blue', linestyles='dashed')          
+            # select the testing values without lagging window
+            testing_values = test_df.loc[test_df.index <= params['final_date']-datetime.timedelta(days=params['lag'])]
         else:
-            x_values = scaler.transform(np.expand_dims(w_df.values[:, col_idx], axis=-1))
-            pred_values = model.predict(np.expand_dims(x_values.reshape(-1,1), axis=0))
-            x_values_2 = list(x_values[..., 0][:-f_steps])+(pred_values.ravel().tolist())
-            pred_values_2 = model.predict(np.expand_dims(np.array(x_values_2).reshape(-1,1), axis=0))
-            pred_values = scaler.inverse_transform(pred_values)
-            pred_values_2 = scaler.inverse_transform(pred_values_2)
-    else:
-	# Predict the values after the last window.
-        x_values = scaler.transform(np.expand_dims(w_df.values[:, col_idx], axis=-1))
-        if recursive:
-            pred_values = predict_next_window_recursive(model,
-                                                        x_values[..., 0],
-                                                        future_window=f_steps)
-            # Predictions after predictions (an extra future windows)
-            x_values_2 = list(x_values[..., 0][:-f_steps])+(pred_values.ravel().tolist())
-            pred_values_2 = predict_next_window_recursive(model,
-                                                          x_values_2,
-                                                          future_window=f_steps)	  
-        else:
-            pred_values = predict_next_window_direct(model, x_values[..., 0])
-            x_values_2 = list(x_values[..., 0][:-f_steps])+(pred_values.ravel().tolist())
-            pred_values_2 = predict_next_window_direct(model, x_values_2)
+            testing_values = test_df
+        
+        # plot testing values without the first window
+        plt.plot(testing_values.iloc[w_size:].index,
+                testing_values.iloc[w_size:].values[:, col_idx],
+                c='orange',
+                label='Valores de prueba')
 
-        pred_values = scaler.inverse_transform(pred_values)
-        pred_values_2 = scaler.inverse_transform(pred_values_2)
-    plt.plot(last_x_values,
-             pred_values.ravel(),
-             c='brown',
-             label='Valores presentes ajustados',
-             marker='o',
-             markersize=4)
-    plt.plot(pd.date_range(start=last_x_values[-1], periods=f_steps+1)[1:],
-             pred_values_2.ravel(),
-             label='Valores futuros predichos',
-             c='red',
-             marker='o',
-             markersize=4)
+        # make and plot predictions for testing serie        
+        for _, step in enumerate(range(0,testing_values.shape[0]-f_steps,f_steps)):
+            x_values = testing_values.iloc[step:step+(w_size)]
+            if x_values.shape[0]>=w_size: 
+                pred_values = predictor(model, x_values, scaler, f_steps, col_idx, recursive)
+                finals = x_values.values.tolist() + pred_values.ravel().tolist()
+                # plot predictions values
+                plt.plot(pd.date_range(start=x_values.index[-1], periods=f_steps+1)[1:],
+                    pred_values.ravel(),
+                    label='Predicciones en test',
+                    marker='o',
+                    markersize=4,
+                    color='red')
+        # plot future predictions
+        pred_values_future = predictor(model, finals[-w_size:], scaler, f_steps, col_idx, recursive)
+        plt.plot(pd.date_range(start=x_values.index[-1], periods=f_steps+1)[1:],
+                    pred_values_future.ravel(),
+                    label='Predicciones futuras',
+                    marker='.',
+                    markersize=4,
+                    color='red')
+    elif params['mode']=='forecasting':
+        pass     
     
-    plt.vlines(last_x_values[-1], 0, train_y_values.max(), colors='blue', linestyles='dashed')
+    plt.vlines(testing_values.index[-1], 0, train_y_values.max(), colors='blue', linestyles='dashed')
     plt.legend()
+    plt.show()
+
     return fig
 
 

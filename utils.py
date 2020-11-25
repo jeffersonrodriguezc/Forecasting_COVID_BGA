@@ -122,8 +122,42 @@ def plot_serie_with_next_window_prediction(model,
             plt.vlines(lag_values.index[-1], 0, train_y_values.max(), colors='blue', linestyles='dashed')          
             # select the testing values without lagging window
             testing_values = test_df.loc[test_df.index <= params['final_date']-datetime.timedelta(days=params['lag'])]
+
+            # make and plot predictions for testing serie        
+            for _, step in enumerate(range(0,testing_values.shape[0]-f_steps,f_steps)):
+                x_values = testing_values.iloc[step:step+(w_size)]
+                if x_values.shape[0]>=w_size: 
+                    pred_values = predictor(model, x_values, scaler, f_steps, col_idx, recursive)
+                    finals = x_values.values[:,col_idx].tolist() + pred_values.ravel().tolist()
+                    # plot predictions values
+                    plt.plot(pd.date_range(start=x_values.index[-1], periods=f_steps+1)[1:],
+                        pred_values.ravel(),
+                        label='Predicciones en test',
+                        marker='o',
+                        markersize=4,
+                        color='red')
+            # plot future predictions
+            pred_values_future = predictor(model, finals[-w_size:], scaler, f_steps, col_idx, recursive)
+            plt.plot(pd.date_range(start=lag_values.index[-1], periods=f_steps+1)[1:],
+                        pred_values_future.ravel(),
+                        label='Predicciones futuras',
+                        marker='*',
+                        markersize=4,
+                        color='red')
         else:
             testing_values = test_df
+            for _, step in enumerate(range(0,testing_values.shape[0]-f_steps,f_steps)):
+                x_values = testing_values.iloc[step:step+(w_size)]
+                if x_values.shape[0]>=w_size: 
+                    pred_values = predictor(model, x_values, scaler, f_steps, col_idx, recursive)
+                    # plot predictions values
+                    plt.plot(pd.date_range(start=x_values.index[-1], periods=f_steps+1)[1:],
+                        pred_values.ravel(),
+                        label='Predicciones en test',
+                        marker='o',
+                        markersize=4,
+                        color='red')
+
         
         # plot testing values without the first window
         plt.plot(testing_values.iloc[w_size:].index,
@@ -131,32 +165,12 @@ def plot_serie_with_next_window_prediction(model,
                 c='orange',
                 label='Valores de prueba')
 
-        # make and plot predictions for testing serie        
-        for _, step in enumerate(range(0,testing_values.shape[0]-f_steps,f_steps)):
-            x_values = testing_values.iloc[step:step+(w_size)]
-            if x_values.shape[0]>=w_size: 
-                pred_values = predictor(model, x_values, scaler, f_steps, col_idx, recursive)
-                finals = x_values.values.tolist() + pred_values.ravel().tolist()
-                # plot predictions values
-                plt.plot(pd.date_range(start=x_values.index[-1], periods=f_steps+1)[1:],
-                    pred_values.ravel(),
-                    label='Predicciones en test',
-                    marker='o',
-                    markersize=4,
-                    color='red')
-        # plot future predictions
-        pred_values_future = predictor(model, finals[-w_size:], scaler, f_steps, col_idx, recursive)
-        plt.plot(pd.date_range(start=x_values.index[-1], periods=f_steps+1)[1:],
-                    pred_values_future.ravel(),
-                    label='Predicciones futuras',
-                    marker='.',
-                    markersize=4,
-                    color='red')
+
     elif params['mode']=='forecasting':
         pass     
     
     plt.vlines(testing_values.index[-1], 0, train_y_values.max(), colors='blue', linestyles='dashed')
-    plt.legend()
+    plt.legend(loc='upper left')
     plt.show()
 
     return fig

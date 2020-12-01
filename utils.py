@@ -348,7 +348,7 @@ def ts_analysis_plots(data, n_lags=100):
     plt.show()
 
 # for preproccesing data
-def preproccesing_data(data, data_colombia):
+def preproccesing_data(data, data_colombia, type_date):
     # all countries
     timeline = sorted(np.unique(data.date.astype('datetime64[ns]')))
     data_selected = data.loc[(~data.iso_code.isna()) & (data.iso_code != 'OWID_WRL'), [
@@ -360,7 +360,7 @@ def preproccesing_data(data, data_colombia):
     result_list = list(zip(records[np.argsort(counts)][::-1],counts[np.argsort(counts)][::-1]))
     #print('Max group of records {}'.format(max(counts)))
     #print('Order by num of records {}'.format(result_list))
-    max_value = result_list[0][0]
+    max_value = max(records)
     print('Max value in days {}'.format(max_value))
     
     # build the structure and apply padding based on max value of days
@@ -371,7 +371,7 @@ def preproccesing_data(data, data_colombia):
 
     final_dict = dict()
     for country in data_to_use.keys():
-        diff = max_value - len(data_to_use[country])
+        diff = (max_value+1) - len(data_to_use[country])
         final_dict[country] = [0.0] * diff + data_to_use[country]
 
     del data_to_use
@@ -382,23 +382,23 @@ def preproccesing_data(data, data_colombia):
 
     ##### Data Colombia
     # how many cases are there by dep
-    df_freq_dep = data_colombia.groupby(['Nombre departamento']).count()['Fecha de inicio de síntomas'].to_frame().rename(
-                                    columns={'Fecha de inicio de síntomas': 'Casos'})
+    df_freq_dep = data_colombia.groupby(['Nombre departamento']).count()[type_date].to_frame().rename(
+                                    columns={type_date: 'Casos'})
     # how many cases are there by country
-    df_freq = data_colombia.groupby(['Nombre municipio']).count()['Fecha de inicio de síntomas'].to_frame().rename(
-                                    columns={'Fecha de inicio de síntomas': 'Casos'})
+    df_freq = data_colombia.groupby(['Nombre municipio']).count()[type_date].to_frame().rename(
+                                    columns={type_date: 'Casos'})
     # group dep and city data by 'Fecha de inicio de síntomas'
     data_colombia_by_city = data_colombia.groupby(
-        ['Nombre municipio', 'Fecha de inicio de síntomas']).agg({
-            'Fecha de inicio de síntomas':
+        ['Nombre municipio', type_date]).agg({
+            type_date:
             'count'
-        }).rename(columns={'Fecha de inicio de síntomas': 'cases'})
+        }).rename(columns={type_date: 'cases'})
 
     data_colombia_by_dep = data_colombia.groupby(
-        ['Nombre departamento', 'Fecha de inicio de síntomas']).agg({
-            'Fecha de inicio de síntomas':
+        ['Nombre departamento', type_date]).agg({
+            type_date:
             'count'
-        }).rename(columns={'Fecha de inicio de síntomas': 'cases'})
+        }).rename(columns={type_date: 'cases'})
 
     # unstack and joins the dataframes
     data_colombia_by_city = data_colombia_by_city.cases.unstack().T.fillna(axis=0, method='backfill', inplace=False)

@@ -27,7 +27,7 @@ def mape(y, yhat, perc=False):
 mape_scorer = make_scorer(mean_squared_error)
 
 
-def train_xgb(params, X_train, y_train):
+def train_xgb(params, X_train, y_train, X_test, y_test):
     """
     Train XGBoost regressor using the parameters given as input. The model
     is validated using standard cross validation technique adapted for time series
@@ -59,7 +59,7 @@ def train_xgb(params, X_train, y_train):
 
         result = model.fit(X_train,
                            y_train,
-                           eval_set=[(X_train, y_train)],
+                           eval_set=[(X_test, y_test)],
                            early_stopping_rounds=50,
                            verbose=False)
 
@@ -78,7 +78,7 @@ def train_xgb(params, X_train, y_train):
         return {"error": ex, "status": STATUS_FAIL}
 
 
-def optimize_xgb(X_train, y_train, max_evals=10):
+def optimize_xgb(X_train, y_train, X_test, y_test, max_evals=10):
     """
     Run Bayesan optimization to find the optimal XGBoost algorithm
     hyperparameters.
@@ -103,7 +103,7 @@ def optimize_xgb(X_train, y_train, max_evals=10):
         "gamma": hp.quniform("gamma", 0, 100, 1)
     }
 
-    objective_fn = partial(train_xgb, X_train=X_train, y_train=y_train)
+    objective_fn = partial(train_xgb, X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test)
 
     trials = Trials()
     best = fmin(fn=objective_fn,
@@ -124,23 +124,23 @@ def optimize_xgb(X_train, y_train, max_evals=10):
     return best, trials
 
 
-def train_direct_xgb(x_train_dset, y_train_dset, params):
+def train_direct_xgb(x_train_dset, y_train_dset, x_test_dset, y_test_dset, params):
     print('Training XGBoosts models using a direct approach...')
     models_res = []
     for idx in range(len(x_train_dset)):
         print('Training XGBoost model {}...'.format(idx))
-        res = train_xgb(params[idx], x_train_dset[idx], y_train_dset[idx])
+        res = train_xgb(params[idx], x_train_dset[idx], y_train_dset[idx], x_test_dset[idx], y_test_dset[idx])
         models_res.append(res)
 
     return models_res
 
 
-def optimize_direct_xgb(x_dset, y_dset, max_evals=10):
+def optimize_direct_xgb(x_dset, y_dset, x_dsett, y_dsett, max_evals=10):
     params, trials = [], []
     print('Optimizing XGBoosts models using a direct approach...')
-    for idx, (X_train, y_train) in enumerate(zip(x_dset, y_dset)):
+    for idx, (X_train, y_train, X_test, y_test) in enumerate(zip(x_dset, y_dset, x_dsett, y_dsett)):
         print('Finding best params for XGBoost model {}...'.format(idx))
-        best_params, best_trials = optimize_xgb(X_train, y_train, max_evals=max_evals)
+        best_params, best_trials = optimize_xgb(X_train, y_train, X_test, y_test, max_evals=max_evals)
         params.append(best_params)
         trials.append(best_trials)
 
@@ -155,7 +155,8 @@ def predict_direct_xgb(X_test, models):
 
 def load_direct_model(source_dir):
     model_paths = glob(os.path.join(source_dir, '*'))
-    model_paths.pop(model_paths.index(source_dir+'scaler.pkl'))
+    model_paths.pop(model_paths.index(source_dir+'scaler_standarization.pkl'))
+    model_paths.pop(model_paths.index(source_dir+'scaler_normalization.pkl'))
     sort_nicely(model_paths)
     models = []
     for model_path in model_paths:

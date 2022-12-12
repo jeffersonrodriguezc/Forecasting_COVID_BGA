@@ -29,10 +29,17 @@ Los modelos siguieron dos estructuras o formas de uso: Recursivo y multi-modelo 
 ### RNN multi-modelo por día - Univariable
 <img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/rnn_recursivo.png?raw=true" width="750" height="400" />
 
-### Forecastin usando Greykite y Propnet
+### Forecasting usando Greykite y Propnet
 <img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/forecast_greykite.png?raw=true" width="750" height="400" />
 
 ## Efectos de factores socio-demográficos y comorbilidades en los fallecimiento por COVID-19
+
+Se relizaron varios entrenamientos utilizando cuatro modelos:
+
+1. Random Forest
+2. Gradient Boosting
+3. Light Boosting
+4. CAT Boosting (Mejor modelo)
 
 #### Interpretación & Análisis de Resultados
 

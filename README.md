@@ -1,6 +1,6 @@
 # Forecasting_COVID_BGA
 
-<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/logo_alcaldia.png?raw=true" width="750" height="400" />
+<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/logo_alcaldia.png?raw=true" width="350" height="250" />
 
 Trabajo desarrollado para su estudio en la Secretaria de Salud de la Alcaldía de Bucaramanga.
 

@@ -11,13 +11,13 @@ Modelo para la predicción de casos de COVID-19 en Bucaramanga. Trabajo desarrol
 
 ### Interpretación & Análisis de Resultados
 
-<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/impacto_model_1_shap.png?raw=true" width="750" height="400" />
+<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/impacto_model_1_shap.png?raw=true" width="450" height="200" />
 
-<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/impacto_model_1_shap_mean.png?raw=true" width="750" height="400" />
+<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/impacto_model_1_shap_mean.png?raw=true" width="450" height="200" />
 
-<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/shap_values_interaction_tabla_comorbilidades.png?raw=true" width="750" height="400" />
+<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/shap_values_interaction_tabla_comorbilidades.png?raw=true" width="450" height="200" />
 
-<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/efecto_edad_fallecimiento.png?raw=true" width="750" height="400" />
+<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/efecto_edad_fallecimiento.png?raw=true" width="450" height="200" />
 
 <img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/riesgo_fallecimiento__estrato.png?raw=true" width="750" height="400" />
 

@@ -23,6 +23,12 @@ Los modelos siguieron dos estructuras o formas de uso: Recursivo y multi-modelo 
 ### XGBoost - Multi-modelo por días - Con suavizado
 <img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/xgboost_directo_smooth.gif?raw=true" width="750" height="400" />
 
+### SVM para regresión - Recursivo
+<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/SVR_recursivo.png?raw=true" width="750" height="400" />
+
+### RNN multi-modelo por día - Univariable
+<img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/rnn_recursivo.png?raw=true" width="750" height="400" />
+
 ### Forecastin usando Greykite y Propnet
 <img src="https://github.com/jeffersonrodriguezc/Forecasting_COVID_BGA/blob/main/images/forecast_greykite.png?raw=true" width="750" height="400" />
 
